@@ -1,0 +1,25 @@
+#!/bin/bash
+# Runs once, on first boot. Rendered by Terraform's templatefile().
+set -euxo pipefail
+
+dnf install -y nginx
+
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+
+cat > /usr/share/nginx/html/index.html <<HTML
+<!doctype html>
+<html>
+<head><title>${instance_name} - ${environment}</title></head>
+<body style="font-family: sans-serif; max-width: 640px; margin: 60px auto;">
+  <h1>Hello from ${instance_name}</h1>
+  <p><b>Environment:</b> ${environment}</p>
+  <p><b>Instance:</b> $INSTANCE_ID</p>
+  <p><b>Availability zone:</b> $AZ</p>
+  <p>Built and managed by Terraform.</p>
+</body>
+</html>
+HTML
+
+systemctl enable --now nginx

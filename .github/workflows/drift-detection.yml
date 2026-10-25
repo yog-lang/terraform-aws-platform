@@ -1,0 +1,94 @@
+# Scheduled drift detection.
+#
+# Every morning, compare real AWS against the state file. If someone changed
+# something by hand, open a GitHub issue so the team knows.
+#
+# Like a security guard doing a daily walk-around checking every door is
+# still locked the way it was left.
+
+name: drift-detection
+
+on:
+  schedule:
+    - cron: "30 3 * * *" # 03:30 UTC = 09:00 IST daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+
+env:
+  TF_VERSION: "~1.13"
+  AWS_REGION: ap-south-1
+
+jobs:
+  drift:
+    name: Drift check (${{ matrix.env }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+    defaults:
+      run:
+        working-directory: envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Write backend.hcl
+        working-directory: .
+        run: |
+          cat > backend.hcl <<EOF
+          bucket       = "${{ secrets.TF_STATE_BUCKET }}"
+          region       = "${{ env.AWS_REGION }}"
+          encrypt      = true
+          use_lockfile = true
+          EOF
+
+      - run: terraform init -input=false -backend-config=../../backend.hcl
+
+      - name: Detect drift
+        id: drift
+        run: |
+          set +e
+          terraform plan -refresh-only -detailed-exitcode -input=false -no-color -lock=false > drift.txt 2>&1
+          code=$?
+          cat drift.txt
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          exit 0
+
+      - name: Open issue if drift found
+        if: steps.drift.outputs.exitcode == '2'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "Drift detected in **${{ matrix.env }}** by run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo '```'
+            tail -n 150 drift.txt
+            echo '```'
+            echo
+            echo "Fix: either \`terraform apply\` (revert AWS to match code) or \`terraform apply -refresh-only\` + update code (accept the change)."
+          } > issue.md
+          gh issue create \
+            --title "Drift detected in ${{ matrix.env }} ($(date -u +%Y-%m-%d))" \
+            --body-file issue.md
+
+      - name: Fail the job so it shows red
+        if: steps.drift.outputs.exitcode == '2'
+        run: |
+          echo "Drift found in ${{ matrix.env }}"
+          exit 1

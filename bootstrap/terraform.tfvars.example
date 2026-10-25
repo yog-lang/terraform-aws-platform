@@ -1,0 +1,10 @@
+# Copy this file to terraform.tfvars and fill it in:
+#   cp terraform.tfvars.example terraform.tfvars
+
+project            = "tfplatform"
+region             = "ap-south-1"
+budget_email       = "you@example.com"
+monthly_budget_usd = 10
+
+# Fill this in later when you push the repo to GitHub (Step 9 in README).
+# github_repo = "your-github-username/terraform-aws-platform"

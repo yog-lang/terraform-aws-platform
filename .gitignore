@@ -1,0 +1,29 @@
+# Provider plugins and module cache - re-downloaded by terraform init
+**/.terraform/*
+
+# State files - NEVER commit (they can contain secrets)
+*.tfstate
+*.tfstate.*
+
+# Plan files and crash logs
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Your real values (examples are committed instead)
+bootstrap/terraform.tfvars
+backend.hcl
+
+# Generated during labs
+drift-report.txt
+labs/import-lab/generated.tf
+
+# NOTE: .terraform.lock.hcl IS committed on purpose - it pins exact provider
+# versions so everyone (and CI) uses the same ones.

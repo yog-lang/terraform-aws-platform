@@ -1,0 +1,7 @@
+# Copy to backend.hcl and fill in the bucket name printed by the bootstrap stack:
+#   cp backend.hcl.example backend.hcl
+
+bucket       = "tfplatform-tfstate-123456789012"
+region       = "ap-south-1"
+encrypt      = true
+use_lockfile = true # native S3 locking (Terraform 1.11+), replaces DynamoDB
